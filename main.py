@@ -27,6 +27,20 @@ from data.preprocessing import CMAPSSPreprocessor, create_sequences, create_test
 from data.dataset import create_data_loaders
 from visualization.plots import create_all_visualizations
 
+import random
+import numpy as np
+
+def set_seed(seed=42):
+    """Set random seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
 
 def parse_args():
     """Parse command line arguments."""
@@ -84,6 +98,9 @@ def run_training(config: Config, epochs: int = None):
     print("\n" + "=" * 60)
     print("TRAINING PHASE")
     print("=" * 60)
+    
+    # Set seed for reproducibility
+    set_seed(42)
     
     if epochs:
         config.EPOCHS = epochs
@@ -144,7 +161,8 @@ def run_visualization(config: Config):
     
     # Create visualizations
     create_all_visualizations(
-        model, X_test, predictions, true_rul, history, config
+        model, X_test, predictions, true_rul, history, config,
+        train_df=train_df, engine_ids=engine_ids
     )
 
 
