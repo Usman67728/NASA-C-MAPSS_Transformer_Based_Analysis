@@ -408,6 +408,163 @@ def plot_temporal_attention(
     return fig
 
 
+def plot_sensor_trends(
+    df,
+    engine_id: int,
+    feature_cols: List[str],
+    sensor_to_subsystem: Dict[str, List[str]],
+    save_path: Optional[str] = None,
+    figsize: Tuple[int, int] = (15, 24)
+) -> plt.Figure:
+    """
+    Plot sensor trends over cycles for a specific engine.
+    
+    Args:
+        df: DataFrame with engine data.
+        engine_id: Engine ID to plot.
+        feature_cols: List of feature columns.
+        sensor_to_subsystem: Mapping of sensors to subsystems.
+        save_path: Path to save figure.
+        figsize: Figure size.
+        
+    Returns:
+        Matplotlib figure.
+    """
+    # Get engine data
+    engine_data = df[df['engine_id'] == engine_id].reset_index(drop=True)
+    
+    # Prepare subsystem colors
+    subsystems = list(set([sub for subs in sensor_to_subsystem.values() for sub in subs]))
+    colors = sns.color_palette("tab20", len(subsystems) + 5)
+    subsystem_color_map = {sub: colors[i] for i, sub in enumerate(subsystems)}
+    subsystem_color_map['Unknown'] = 'grey'
+    
+    # Create grid
+    num_features = len(feature_cols)
+    n_cols = 3
+    n_rows = (num_features + n_cols - 1) // n_cols
+    
+    fig, axes = plt.subplots(n_rows, n_cols, figsize=figsize, sharex=True)
+    axes = axes.flatten()
+    
+    for i, feature in enumerate(feature_cols):
+        subs = sensor_to_subsystem.get(feature, ['Unknown'])
+        color = subsystem_color_map.get(subs[-1] if subs else 'Unknown', 'grey')
+        
+        axes[i].plot(engine_data['cycle'], engine_data[feature], color=color, linewidth=1.5)
+        axes[i].set_title(f"{feature} ({subs[0] if subs else 'Unknown'})", fontsize=9)
+        axes[i].set_ylabel("Normalized Value", fontsize=8)
+        axes[i].grid(True, alpha=0.3)
+    
+    # Remove empty subplots
+    for j in range(num_features, len(axes)):
+        fig.delaxes(axes[j])
+    
+    plt.xlabel("Cycle")
+    plt.suptitle(f"Sensor Trends over Cycles for Engine {engine_id}", fontsize=14, fontweight='bold')
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Saved: {save_path}")
+    
+    return fig
+
+
+def plot_subsystem_importance(
+    feature_importance: Dict[str, float],
+    sensor_to_subsystem: Dict[str, List[str]],
+    save_path: Optional[str] = None,
+    figsize: Tuple[int, int] = (12, 8)
+) -> plt.Figure:
+    """
+    Plot subsystem importance aggregated from sensor attributions.
+    
+    Args:
+        feature_importance: Dictionary of feature -> importance score.
+        sensor_to_subsystem: Mapping of sensors to subsystems.
+        save_path: Path to save figure.
+        figsize: Figure size.
+        
+    Returns:
+        Matplotlib figure.
+    """
+    # Aggregate importance by subsystem
+    subsystem_scores = {}
+    for sensor, importance in feature_importance.items():
+        subs = sensor_to_subsystem.get(sensor, ['Unknown'])
+        for sub in subs:
+            subsystem_scores[sub] = subsystem_scores.get(sub, 0.0) + importance
+    
+    # Sort by importance
+    sorted_subs = sorted(subsystem_scores.items(), key=lambda x: x[1], reverse=True)
+    subsystems = [s[0] for s in sorted_subs]
+    scores = [s[1] for s in sorted_subs]
+    
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Create bar chart with gradient colors
+    colors = sns.color_palette("magma", len(subsystems))
+    bars = ax.bar(range(len(subsystems)), scores, color=colors, edgecolor='black', linewidth=0.5)
+    
+    ax.set_xticks(range(len(subsystems)))
+    ax.set_xticklabels(subsystems, rotation=45, ha='right', fontsize=9)
+    ax.set_ylabel("Importance", fontsize=12)
+    ax.set_xlabel("Subsystem", fontsize=12)
+    ax.set_title("Subsystem Importance (Aggregated from sensor attributions)", fontsize=14, fontweight='bold')
+    ax.grid(True, alpha=0.3, axis='y')
+    
+    plt.tight_layout()
+    
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Saved: {save_path}")
+    
+    return fig
+
+
+def plot_rul_line_comparison(
+    engine_ids: np.ndarray,
+    predictions: np.ndarray,
+    true_rul: np.ndarray,
+    save_path: Optional[str] = None,
+    figsize: Tuple[int, int] = (14, 6)
+) -> plt.Figure:
+    """
+    Plot predicted vs true RUL as line graph by engine ID.
+    
+    Args:
+        engine_ids: Array of engine IDs.
+        predictions: Predicted RUL values.
+        true_rul: True RUL values.
+        save_path: Path to save figure.
+        figsize: Figure size.
+        
+    Returns:
+        Matplotlib figure.
+    """
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    ax.plot(engine_ids, true_rul, label='True RUL', marker='o', linestyle='-', 
+            color='blue', linewidth=1.5, markersize=5)
+    ax.plot(engine_ids, predictions, label='Predicted RUL', marker='x', linestyle='--', 
+            color='red', linewidth=1.5, markersize=5)
+    
+    ax.set_xlabel("Engine ID", fontsize=12)
+    ax.set_ylabel("Remaining Useful Life (cycles)", fontsize=12)
+    ax.set_title("Predicted vs True RUL for Test Engines", fontsize=14, fontweight='bold')
+    ax.legend(loc='upper right')
+    ax.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    if save_path:
+        fig.savefig(save_path, dpi=150, bbox_inches='tight')
+        print(f"Saved: {save_path}")
+    
+    return fig
+
+
 def create_all_visualizations(
     model,
     X_test: np.ndarray,
@@ -415,7 +572,9 @@ def create_all_visualizations(
     true_rul: np.ndarray,
     history: Dict[str, List[float]],
     config: Optional[Config] = None,
-    output_dir: Optional[str] = None
+    output_dir: Optional[str] = None,
+    train_df=None,
+    engine_ids: np.ndarray = None
 ):
     """
     Create all visualizations and save to output directory.
@@ -428,6 +587,8 @@ def create_all_visualizations(
         history: Training history.
         config: Configuration object.
         output_dir: Output directory for plots.
+        train_df: Training DataFrame for sensor trends.
+        engine_ids: Engine IDs for line plot.
     """
     config = config or Config()
     output_dir = output_dir or config.OUTPUT_DIR
@@ -436,23 +597,39 @@ def create_all_visualizations(
     print("\nGenerating visualizations...")
     
     # Training curves
-    if history:
+    if history and 'train_loss' in history and len(history['train_loss']) > 0:
         plot_training_curves(
             history,
             save_path=os.path.join(output_dir, 'training_curves.png')
         )
     
-    # Predictions vs True
+    # Predictions vs True (scatter)
     plot_predictions_vs_true(
         predictions, true_rul,
         save_path=os.path.join(output_dir, 'predictions_vs_true.png')
     )
+    
+    # Predictions vs True (line graph)
+    if engine_ids is not None:
+        plot_rul_line_comparison(
+            engine_ids, predictions, true_rul,
+            save_path=os.path.join(output_dir, 'rul_line_comparison.png')
+        )
     
     # Error distribution
     plot_error_distribution(
         predictions, true_rul,
         save_path=os.path.join(output_dir, 'error_distribution.png')
     )
+    
+    # Sensor trends (if train data available)
+    if train_df is not None:
+        sample_engine = train_df['engine_id'].unique()[0]
+        plot_sensor_trends(
+            train_df, sample_engine, 
+            config.FEATURE_COLS, config.SENSOR_TO_SUBSYSTEM,
+            save_path=os.path.join(output_dir, 'sensor_trends.png')
+        )
     
     # Attention heatmap (first test sample)
     model.eval()
@@ -476,6 +653,17 @@ def create_all_visualizations(
                 layer_name="Last Encoder Layer",
                 save_path=os.path.join(output_dir, 'multi_head_attention.png')
             )
+    
+    # Feature importance (simple average over inputs)
+    feature_importance = {}
+    for i, feat in enumerate(config.FEATURE_COLS):
+        feature_importance[feat] = float(np.abs(X_test[:, :, i]).mean())
+    
+    # Subsystem importance
+    plot_subsystem_importance(
+        feature_importance, config.SENSOR_TO_SUBSYSTEM,
+        save_path=os.path.join(output_dir, 'subsystem_importance.png')
+    )
     
     print(f"Visualizations saved to: {output_dir}")
     plt.close('all')

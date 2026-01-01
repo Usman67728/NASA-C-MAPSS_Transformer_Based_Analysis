@@ -27,6 +27,20 @@ from data.preprocessing import CMAPSSPreprocessor, create_sequences, create_test
 from data.dataset import create_data_loaders
 from visualization.plots import create_all_visualizations
 
+import random
+import numpy as np
+
+def set_seed(seed=42):
+    """Set random seed for reproducibility."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+
 
 def parse_args():
     """Parse command line arguments."""
@@ -85,6 +99,9 @@ def run_training(config: Config, epochs: int = None):
     print("TRAINING PHASE")
     print("=" * 60)
     
+    # Set seed for reproducibility
+    set_seed(42)
+    
     if epochs:
         config.EPOCHS = epochs
     
@@ -106,7 +123,7 @@ def run_visualization(config: Config):
         return
     
     # Load model
-    checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE)
+    checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE, weights_only=False)
     model = create_model(
         input_dim=config.INPUT_DIM,
         d_model=config.D_MODEL,
@@ -121,8 +138,12 @@ def run_visualization(config: Config):
     # Load history
     history = {}
     if os.path.exists(history_path):
-        with open(history_path, 'r') as f:
-            history = json.load(f)
+        try:
+            with open(history_path, 'r') as f:
+                history = json.load(f)
+        except json.JSONDecodeError:
+            print("Warning: Could not load training history (corrupted). Skipping training curves.")
+            history = {}
     
     # Prepare test data
     preprocessor = CMAPSSPreprocessor(config)
@@ -140,7 +161,8 @@ def run_visualization(config: Config):
     
     # Create visualizations
     create_all_visualizations(
-        model, X_test, predictions, true_rul, history, config
+        model, X_test, predictions, true_rul, history, config,
+        train_df=train_df, engine_ids=engine_ids
     )
 
 

@@ -179,7 +179,7 @@ def load_and_evaluate(
     print("Loading model from checkpoint...")
     
     # Load checkpoint
-    checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE)
+    checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE, weights_only=False)
     
     # Create model
     model = create_model(
