@@ -106,7 +106,7 @@ def run_visualization(config: Config):
         return
     
     # Load model
-    checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE)
+    checkpoint = torch.load(checkpoint_path, map_location=config.DEVICE, weights_only=False)
     model = create_model(
         input_dim=config.INPUT_DIM,
         d_model=config.D_MODEL,
@@ -121,8 +121,12 @@ def run_visualization(config: Config):
     # Load history
     history = {}
     if os.path.exists(history_path):
-        with open(history_path, 'r') as f:
-            history = json.load(f)
+        try:
+            with open(history_path, 'r') as f:
+                history = json.load(f)
+        except json.JSONDecodeError:
+            print("Warning: Could not load training history (corrupted). Skipping training curves.")
+            history = {}
     
     # Prepare test data
     preprocessor = CMAPSSPreprocessor(config)

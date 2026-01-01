@@ -133,8 +133,7 @@ class Trainer:
             self.optimizer,
             mode='min',
             factor=0.5,
-            patience=5,
-            verbose=True
+            patience=5
         )
         
         # Early stopping
@@ -260,8 +259,13 @@ class Trainer:
     def save_history(self):
         """Save training history to JSON file."""
         history_path = os.path.join(self.save_dir, 'training_history.json')
+        # Convert numpy floats to Python floats for JSON serialization
+        serializable_history = {
+            key: [float(v) for v in values]
+            for key, values in self.history.items()
+        }
         with open(history_path, 'w') as f:
-            json.dump(self.history, f, indent=2)
+            json.dump(serializable_history, f, indent=2)
     
     def train(
         self, 
@@ -353,7 +357,7 @@ class Trainer:
         """Load the best checkpoint."""
         checkpoint_path = os.path.join(self.save_dir, 'checkpoint_best.pt')
         if os.path.exists(checkpoint_path):
-            checkpoint = torch.load(checkpoint_path, map_location=self.config.DEVICE)
+            checkpoint = torch.load(checkpoint_path, map_location=self.config.DEVICE, weights_only=False)
             self.model.load_state_dict(checkpoint['model_state_dict'])
             print(f"Loaded best model from epoch {checkpoint['epoch']}")
         else:
