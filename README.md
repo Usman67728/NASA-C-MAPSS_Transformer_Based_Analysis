@@ -271,10 +271,10 @@ If you use this code in your research, please cite:
 
 ```bibtex
 @software{cmapss_transformer_rul,
-  author = {Your Name},
+  author = {Muhammad Usman},
   title = {NASA C-MAPSS Transformer-Based RUL Prediction},
-  year = {2024},
-  url = {https://github.com/yourusername/NASA-C-MAPSS_Transformer_Based_Analysis}
+  year = {2025},
+  url = {https://github.com/Usman67728/NASA-C-MAPSS_Transformer_Based_Analysis}
 }
 ```
 
